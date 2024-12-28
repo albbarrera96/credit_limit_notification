@@ -1,0 +1,4 @@
+<manifest projecttype="ACCOUNTCUSTOMIZATION">
+  <projectname>credit_limit_notification</projectname>
+  <frameworkversion>1.0</frameworkversion>
+</manifest>
