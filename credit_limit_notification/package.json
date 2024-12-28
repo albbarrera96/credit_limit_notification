@@ -1,0 +1,13 @@
+{
+  "name": "credit_limit_notification",
+  "version": "1.0.0",
+  "description": "",
+  "main": "suitecloud.config.js",
+  "keywords": [],
+  "author": "Alberto Barrera Aponte",
+  "license": "ISC",
+  "devDependencies": {
+    "@hitc/netsuite-types": "^2024.2.7",
+    "typescript": "^5.7.2"
+  }
+}
