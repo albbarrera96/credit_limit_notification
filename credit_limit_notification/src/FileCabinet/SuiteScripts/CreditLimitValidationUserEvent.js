@@ -3,48 +3,55 @@
  * @NScriptType UserEventScript
  * @Company Entropy Technologies
  * @Author Alberto Barrera Aponte
-*/
+ */
 define(["require", "exports", "N/log", "N/record", "N/email", "N/runtime"], function (require, exports, log, record, email, runtime) {
     "use strict";
     function afterSubmit(context) {
-        if (context.type !== context.UserEventType.CREATE && context.type !== context.UserEventType.EDIT) {
-            return;
-        }
         try {
-            const sales_order = context.newRecord;
-            const customer_id = sales_order.getValue({ fieldId: 'entity' });
-            if (!customer_id) {
-                log.error('Missing Customer ID', 'No customer ID found on the Sales Order.');
-                return;
-            }
-            // Cargar el registro del cliente
-            const customer_record = record.load({ type: record.Type.CUSTOMER, id: customer_id });
-            const credit_limit = customer_record.getValue({ fieldId: 'creditlimit' });
-            const balance = customer_record.getValue({ fieldId: 'balance' });
-            // Validar si el balance excede el límite de crédito
-            if (balance > credit_limit) {
-                log.error('Credit Limit Exceeded', `Customer ${customer_id} has exceeded their credit limit.`);
-                // Obtener el destinatario dinámico desde los parámetros del script
-                const script_obj = runtime.getCurrentScript();
-                const recipient = script_obj.getParameter({ name: 'custscript_dynamic_email_recipient' });
-                if (!recipient) {
-                    log.error('Missing Email Recipient', 'No email recipient defined in the script parameter.');
-                    return;
-                }
-                // Enviar correo al equipo de crédito
-                email.send({
-                    author: -5, // -5 representa el remitente por defecto
-                    recipients: recipient,
-                    subject: 'Credit Limit Exceeded',
-                    body: `Customer ${customer_id} has exceeded their credit limit. \n\nCurrent Balance: ${balance} \nCredit Limit: ${credit_limit}`
+            if (context.type === context.UserEventType.CREATE || context.type === context.UserEventType.EDIT) {
+                var sales_order = context.newRecord;
+                var customer_id = String(sales_order.getValue('entity'));
+                var customer_record = record.load({
+                    type: record.Type.CUSTOMER,
+                    id: customer_id
                 });
+                var customer_name = customer_record.getValue({ fieldId: 'companyname' });
+                var credit_limit = customer_record.getValue({ fieldId: 'creditlimit' });
+                var balance = customer_record.getValue({ fieldId: 'unbilledorders' });
+                var order_total = sales_order.getValue({ fieldId: 'total' });
+                if (balance + order_total > credit_limit) {
+                    var user = runtime.getCurrentUser();
+                    sendEmail(balance + order_total, credit_limit, customer_name, user.id);
+                    log.audit('Credit Limit Exceeded', 'Customer: ' + customer_name + ' | Credit Limit: ' + credit_limit + ' | Total Sales Order Amount: ' + balance + order_total);
+                }
             }
         }
         catch (error) {
             log.error('Error in afterSubmit', error.message);
         }
     }
+    function sendEmail(total, limit, customer, id) {
+        try {
+            email.send({
+                author: id,
+                recipients: runtime.getCurrentUser().email,
+                subject: 'Credit Limit Exceeded',
+                body: '<p>Dear ' + customer + ', </p>' +
+                    '<p>We would like to inform you that the total amount of the latest Sales Order created or edited on your account exceeds your credit limit.</p>' +
+                    '<p><strong>Details:</strong></p>' +
+                    '<ul>' +
+                    '<li>Credit Limit: ' + limit + '</li>' +
+                    '<li>Total Sales Order Amount: ' + total + '</li>' +
+                    '</ul>' +
+                    '<p>Please take steps to address this situation as soon as possible.</p>' +
+                    '<p>Sincerely,<br>The Sales Team</p>'
+            });
+        }
+        catch (error) {
+            log.error('Error in sendEmail', error.message);
+        }
+    }
     return {
-        afterSubmit
+        afterSubmit: afterSubmit
     };
 });
